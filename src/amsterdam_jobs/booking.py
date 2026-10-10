@@ -13,6 +13,7 @@ PAGE_SIZE = 10
 def fetch_all_jobs():
     all_jobs = []
     page = 1
+    expected_total_count = None
 
     while True:
         # Request the current page
@@ -25,7 +26,20 @@ def fetch_all_jobs():
 
         data = response.json()
         jobs = data["jobs"]
-        total_count = data["totalCount"]
+        reported_count = data["totalCount"]
+
+        # Check that the reported total remains consistent
+        if expected_total_count is None:
+            expected_total_count = reported_count
+
+            if expected_total_count == 0:
+                raise RuntimeError("API returned zero jobs")
+
+        elif reported_count != expected_total_count:
+            raise RuntimeError(
+                "API total count changed during collection: "
+                f"{expected_total_count} -> {reported_count}"
+            )
 
         # Add the received jobs to the collection
         all_jobs.extend(jobs)
@@ -35,25 +49,53 @@ def fetch_all_jobs():
             f"Total collected: {len(all_jobs)}"
         )
 
-        # Stop when all jobs have been collected
-        if len(all_jobs) >= total_count or not jobs:
+        # Stop when the expected number of jobs is collected
+        if len(all_jobs) >= expected_total_count:
             break
+
+        # Reject an incomplete collection
+        if not jobs:
+            raise RuntimeError(
+                "Collection stopped before all jobs were received"
+            )
 
         page += 1
 
         # Pause between API requests
         time.sleep(1)
 
-    return all_jobs, total_count
+    # Verify the total number of collected jobs
+    if len(all_jobs) != expected_total_count:
+        raise RuntimeError(
+            f"Expected {expected_total_count} jobs, "
+            f"but collected {len(all_jobs)}"
+        )
+
+    # Check that job IDs are present and unique
+    job_ids = [
+        job_record["data"].get("req_id")
+        for job_record in all_jobs
+    ]
+
+    if any(job_id is None or job_id == "" for job_id in job_ids):
+        raise RuntimeError("Some jobs have missing IDs")
+
+    if len(set(job_ids)) != len(job_ids):
+        raise RuntimeError("Duplicate job IDs detected")
+
+    return all_jobs, expected_total_count
 
 
 def main():
     jobs, total_count = fetch_all_jobs()
 
-    # Save the combined result
-    output_path = Path("data/raw/booking_jobs_all.json")
+    # Build the output path relative to the project root
+    project_root = Path(__file__).resolve().parents[2]
+    output_path = project_root / "data/raw/booking_jobs_all.json"
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Save the combined result
     result = {
         "jobs": jobs,
         "totalCount": total_count,
@@ -62,8 +104,8 @@ def main():
     with output_path.open("w", encoding="utf-8") as file:
         json.dump(result, file, ensure_ascii=False, indent=2)
 
-    # Check for duplicate job IDs
-    job_ids = [job["data"].get("req_id") for job in jobs]
+    # Display collection statistics
+    job_ids = [job["data"]["req_id"] for job in jobs]
 
     print("\nCollection completed!")
     print("Jobs collected:", len(jobs))

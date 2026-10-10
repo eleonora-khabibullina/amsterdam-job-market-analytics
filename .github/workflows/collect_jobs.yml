@@ -1,0 +1,39 @@
+
+name: Collect Booking.com Jobs
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '17 9 * * *'
+      timezone: 'Europe/Amsterdam'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: booking-job-collection
+  cancel-in-progress: false
+
+jobs:
+  collect-jobs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run data pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m amsterdam_jobs.pipeline
