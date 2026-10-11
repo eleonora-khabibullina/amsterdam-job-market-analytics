@@ -33,3 +33,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python -m amsterdam_jobs.pipeline
+
+      - name: Export jobs to Google Sheets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          credentials_file="$(mktemp "$RUNNER_TEMP/google-service-account.XXXXXX")"
+          trap 'rm -f "$credentials_file"' EXIT
+
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > "$credentials_file"
+          export GOOGLE_SERVICE_ACCOUNT_FILE="$credentials_file"
+
+          python -m amsterdam_jobs.export_to_sheets
