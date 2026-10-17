@@ -57,3 +57,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  notify-deployment:
+    name: Notify Telegram - Dashboard
+    needs: [deploy]
+    if: ${{ always() && needs.deploy.result != 'skipped' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send Telegram notification
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERT_STATUS: ${{ needs.deploy.result }}
+          ALERT_LABEL: Dashboard deployment
+        run: python3 src/amsterdam_jobs/notifications.py
+
+

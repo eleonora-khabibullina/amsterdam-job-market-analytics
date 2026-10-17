@@ -47,3 +47,24 @@ jobs:
           export GOOGLE_SERVICE_ACCOUNT_FILE="$credentials_file"
 
           python -m amsterdam_jobs.export_to_sheets
+
+
+  notify-collection:
+    name: Notify Telegram - Collection
+    needs: [collect-jobs]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send Telegram notification
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERT_STATUS: ${{ needs['collect-jobs'].result }}
+          ALERT_LABEL: Booking.com collection and Sheets export
+        run: python3 src/amsterdam_jobs/notifications.py
+
