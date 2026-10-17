@@ -1,0 +1,35 @@
+
+name: Test Telegram Failure Alert
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate-failure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Simulate pipeline failure
+        run: |
+          echo "Simulating a pipeline failure"
+          exit 1
+
+  notify:
+    needs: [simulate-failure]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERT_STATUS: ${{ needs['simulate-failure'].result }}
+          ALERT_LABEL: "Test: simulated pipeline failure"
+        run: python3 src/amsterdam_jobs/notifications.py
